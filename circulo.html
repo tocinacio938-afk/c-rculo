@@ -1,15 +1,4 @@
 <!DOCTYPE html>
-<script>
-let audioEnabled = false;
-let audioContext;
-
-function enableAudio() {
-  if (!audioEnabled) {
-    audioContext = new AudioContext();
-    audioContext.resume();
-    audioEnabled = true;
-  }
-}
 <html>
 <head>
 <meta charset="UTF-8">
@@ -71,35 +60,85 @@ const ctx = canvas.getContext("2d");
 canvas.width = innerWidth;
 canvas.height = innerHeight;
 
+let mode = "menu"; // menu | single | multi
 let drawing = false;
 let points = [];
 let drawColor = "white";
+let currentPlayer = 1;
+let scores = { 1: null, 2: null };
 
-// 🔊 sonidos (frecuencias)
+// ===== AUDIO (iPhone OK) =====
+let audioEnabled = false;
+let audioContext;
+
+function enableAudio() {
+  if (!audioEnabled) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    audioContext.resume();
+    audioEnabled = true;
+  }
+}
+
 function playSound(type) {
   if (!audioEnabled) return;
-
   const osc = audioContext.createOscillator();
   const gain = audioContext.createGain();
   osc.connect(gain);
   gain.connect(audioContext.destination);
 
-  if (type === "bad") osc.frequency.value = 150;
-  if (type === "ok") osc.frequency.value = 400;
-  if (type === "good") osc.frequency.value = 700;
+  osc.frequency.value =
+    type === "bad" ? 150 : type === "ok" ? 400 : 700;
 
   osc.start();
   gain.gain.exponentialRampToValueAtTime(
     0.0001,
-    audioContext.currentTime + 0.5
+    audioContext.currentTime + 0.4
   );
 }
 
-// 🏆 mejor puntuación
-let bestScore = localStorage.getItem("bestCircle") || 0;
+// ===== VIBRACIÓN =====
+function vibrate(ms) {
+  if (navigator.vibrate) navigator.vibrate(ms);
+}
 
-canvas.addEventListener("touchstart", () => {
+// ===== MENÚ =====
+function drawMenu() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = "white";
+  ctx.font = "40px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("CÍRCULO PERFECTO", canvas.width/2, 150);
+
+  ctx.font = "30px Arial";
+  ctx.fillText("Toca para JUGAR SOLO", canvas.width/2, 300);
+  ctx.fillText("Toca abajo para MULTIPLAYER", canvas.width/2, 380);
+}
+
+// ===== GUÍA =====
+function drawGuide(yOffset, height) {
+  ctx.strokeStyle = "rgba(255,255,255,0.2)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(canvas.width/2, yOffset + height/2, 120, 0, Math.PI*2);
+  ctx.stroke();
+}
+
+// ===== EVENTOS =====
+canvas.addEventListener("touchstart", e => {
   enableAudio();
+
+  if (mode === "menu") {
+    const y = e.touches[0].clientY;
+    if (y < canvas.height/2) {
+      mode = "single";
+    } else {
+      mode = "multi";
+      scores = {1:null, 2:null};
+      currentPlayer = 1;
+    }
+    return;
+  }
+
   points = [];
   drawing = true;
   ctx.beginPath();
@@ -110,62 +149,91 @@ canvas.addEventListener("touchmove", e => {
   const t = e.touches[0];
   points.push({ x: t.clientX, y: t.clientY });
 
-  ctx.lineWidth = 5;
   ctx.strokeStyle = drawColor;
+  ctx.lineWidth = 5;
   ctx.lineTo(t.clientX, t.clientY);
   ctx.stroke();
 });
 
 canvas.addEventListener("touchend", () => {
+  if (!drawing) return;
   drawing = false;
-  evaluateCircle();
+  const score = evaluateCircle();
+  if (mode === "single") showResult(score);
+  else handleMultiplayer(score);
 });
 
+// ===== EVALUAR =====
 function evaluateCircle() {
-  if (points.length < 20) return;
+  if (points.length < 30) return 0;
 
   let cx = 0, cy = 0;
   points.forEach(p => { cx += p.x; cy += p.y; });
   cx /= points.length;
   cy /= points.length;
 
-  let distances = points.map(p =>
-    Math.hypot(p.x - cx, p.y - cy)
-  );
+  let distances = points.map(p => Math.hypot(p.x-cx, p.y-cy));
+  let avg = distances.reduce((a,b)=>a+b)/distances.length;
+  let variance = distances.reduce((a,b)=>a+Math.abs(b-avg),0)/distances.length;
 
-  let avg = distances.reduce((a,b)=>a+b) / distances.length;
-  let variance = distances.reduce((a,b)=>a + Math.abs(b - avg), 0) / distances.length;
+  let score = Math.max(0, Math.round(100 - variance));
 
-  let score = Math.max(0, 100 - variance);
-  score = Math.round(score);
+  let type = score < 50 ? "bad" : score < 80 ? "ok" : "good";
+  drawColor = type === "bad" ? "red" : type === "ok" ? "yellow" : "lime";
 
-  let color, sound;
-  if (score < 50) { color = "red"; sound = "bad"; }
-  else if (score < 80) { color = "yellow"; sound = "ok"; }
-  else { color = "lime"; sound = "good"; }
+  playSound(type);
+  vibrate(type === "good" ? 200 : 80);
 
-  playSound(sound);
+  return score;
+}
 
-  if (score > bestScore) {
-    bestScore = score;
-    localStorage.setItem("bestCircle", bestScore);
+// ===== RESULTADOS =====
+function showResult(score) {
+  alert(`Tu puntuación: ${score}%`);
+  mode = "menu";
+}
+
+function handleMultiplayer(score) {
+  scores[currentPlayer] = score;
+  currentPlayer++;
+
+  if (currentPlayer > 2) {
+    let winner =
+      scores[1] > scores[2] ? "Jugador 1 🏆" :
+      scores[2] > scores[1] ? "Jugador 2 🏆" :
+      "Empate 🤝";
+
+    alert(
+      `J1: ${scores[1]}%\nJ2: ${scores[2]}%\n\n${winner}`
+    );
+    mode = "menu";
+  }
+}
+
+// ===== LOOP =====
+function loop() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if (mode === "menu") {
+    drawMenu();
   }
 
-  document.getElementById("score").innerHTML =
-    `<span style="color:${color}">Tu círculo fue ${score}% perfecto</span>`;
+  if (mode === "multi") {
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height/2);
+    ctx.lineTo(canvas.width, canvas.height/2);
+    ctx.stroke();
 
-  document.getElementById("best").innerHTML =
-    `🏆 Mejor puntuación: <b>${bestScore}%</b>`;
+    drawGuide(0, canvas.height/2);
+    drawGuide(canvas.height/2, canvas.height/2);
+  }
 
-  drawColor = color;
-  document.getElementById("result").style.display = "flex";
+  requestAnimationFrame(loop);
 }
 
-function reset() {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  document.getElementById("result").style.display = "none";
-  drawColor = "white";
-}
+loop();
 </script>
 
 </body>
