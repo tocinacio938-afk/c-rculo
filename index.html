@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Puntero</title>
+<style>
+body {
+  margin: 0;
+  background: black;
+}
+#dot {
+  width: 20px;
+  height: 20px;
+  background: red;
+  border-radius: 50%;
+  position: absolute;
+}
+</style>
+</head>
+<body>
+
+<div id="dot"></div>
+
+<script>
+document.addEventListener("click", () => {
+  const dot = document.getElementById("dot");
+  const x = Math.random() * window.innerWidth;
+  const y = Math.random() * window.innerHeight;
+  dot.style.left = x + "px";
+  dot.style.top = y + "px";
+});
+</script>
+
+</body>
+</html>
