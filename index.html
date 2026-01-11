@@ -2,33 +2,121 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Puntero</title>
+<title>Círculo Perfecto</title>
 <style>
 body {
   margin: 0;
-  background: black;
+  background: #111;
+  overflow: hidden;
+  touch-action: none;
+  font-family: Arial, sans-serif;
+  color: white;
 }
-#dot {
-  width: 20px;
-  height: 20px;
-  background: red;
-  border-radius: 50%;
-  position: absolute;
+
+canvas {
+  display: block;
+}
+
+#result {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.85);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+button {
+  padding: 15px 25px;
+  font-size: 18px;
+  border: none;
+  border-radius: 8px;
+  margin-top: 15px;
 }
 </style>
 </head>
 <body>
 
-<div id="dot"></div>
+<canvas id="canvas"></canvas>
+
+<div id="result">
+  <h1 id="score"></h1>
+  <button onclick="reset()">Reintentar</button>
+</div>
 
 <script>
-document.addEventListener("click", () => {
-  const dot = document.getElementById("dot");
-  const x = Math.random() * window.innerWidth;
-  const y = Math.random() * window.innerHeight;
-  dot.style.left = x + "px";
-  dot.style.top = y + "px";
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+
+let drawing = false;
+let points = [];
+let drawColor = "white";
+
+canvas.addEventListener("touchstart", e => {
+  points = [];
+  drawing = true;
+  ctx.beginPath();
 });
+
+canvas.addEventListener("touchmove", e => {
+  if (!drawing) return;
+  const t = e.touches[0];
+  points.push({ x: t.clientX, y: t.clientY });
+
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = drawColor;
+  ctx.lineTo(t.clientX, t.clientY);
+  ctx.stroke();
+});
+
+canvas.addEventListener("touchend", () => {
+  drawing = false;
+  evaluateCircle();
+});
+
+function evaluateCircle() {
+  if (points.length < 20) return;
+
+  let cx = 0, cy = 0;
+  points.forEach(p => { cx += p.x; cy += p.y; });
+  cx /= points.length;
+  cy /= points.length;
+
+  let distances = points.map(p =>
+    Math.hypot(p.x - cx, p.y - cy)
+  );
+
+  let avg = distances.reduce((a,b)=>a+b) / distances.length;
+  let variance = distances.reduce((a,b)=>a + Math.abs(b - avg), 0) / distances.length;
+
+  let score = Math.max(0, 100 - variance);
+  score = Math.round(score);
+
+  // COLORES SEGÚN RESULTADO
+  let color;
+  if (score < 50) color = "red";
+  else if (score < 80) color = "yellow";
+  else color = "lime";
+
+  drawColor = color;
+
+  document.getElementById("score").innerHTML =
+    `<span style="color:${color}">Tu círculo fue ${score}% perfecto</span>`;
+
+  document.getElementById("result").style.display = "flex";
+}
+
+function reset() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  document.getElementById("result").style.display = "none";
+  drawColor = "white";
+}
 </script>
 
 </body>
