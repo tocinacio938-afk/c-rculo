@@ -37,6 +37,11 @@ button {
   border-radius: 8px;
   margin-top: 15px;
 }
+
+#best {
+  margin-top: 10px;
+  font-size: 18px;
+}
 </style>
 </head>
 <body>
@@ -45,6 +50,7 @@ button {
 
 <div id="result">
   <h1 id="score"></h1>
+  <div id="best"></div>
   <button onclick="reset()">Reintentar</button>
 </div>
 
@@ -58,7 +64,29 @@ let drawing = false;
 let points = [];
 let drawColor = "white";
 
-canvas.addEventListener("touchstart", e => {
+// 🔊 sonidos (frecuencias)
+function playSound(type) {
+  const audio = new AudioContext();
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+  osc.connect(gain);
+  gain.connect(audio.destination);
+
+  if (type === "bad") osc.frequency.value = 150;
+  if (type === "ok") osc.frequency.value = 400;
+  if (type === "good") osc.frequency.value = 700;
+
+  osc.start();
+  gain.gain.exponentialRampToValueAtTime(
+    0.0001,
+    audio.currentTime + 0.5
+  );
+}
+
+// 🏆 mejor puntuación
+let bestScore = localStorage.getItem("bestCircle") || 0;
+
+canvas.addEventListener("touchstart", () => {
   points = [];
   drawing = true;
   ctx.beginPath();
@@ -98,17 +126,25 @@ function evaluateCircle() {
   let score = Math.max(0, 100 - variance);
   score = Math.round(score);
 
-  // COLORES SEGÚN RESULTADO
-  let color;
-  if (score < 50) color = "red";
-  else if (score < 80) color = "yellow";
-  else color = "lime";
+  let color, sound;
+  if (score < 50) { color = "red"; sound = "bad"; }
+  else if (score < 80) { color = "yellow"; sound = "ok"; }
+  else { color = "lime"; sound = "good"; }
 
-  drawColor = color;
+  playSound(sound);
+
+  if (score > bestScore) {
+    bestScore = score;
+    localStorage.setItem("bestCircle", bestScore);
+  }
 
   document.getElementById("score").innerHTML =
     `<span style="color:${color}">Tu círculo fue ${score}% perfecto</span>`;
 
+  document.getElementById("best").innerHTML =
+    `🏆 Mejor puntuación: <b>${bestScore}%</b>`;
+
+  drawColor = color;
   document.getElementById("result").style.display = "flex";
 }
 
