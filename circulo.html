@@ -56,34 +56,23 @@ button {
 
 
 </script>
-// ===== CANVAS =====
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-canvas.width = innerWidth;
-canvas.height = innerHeight;
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
 
 // ===== ESTADO =====
-let mode = "menu"; // menu | single | multi
+let mode = "menu";
 let drawing = false;
 let points = [];
 let drawColor = "white";
 let currentPlayer = 1;
-let scores = { 1: null, 2: null };
-
-// ===== BOTONES =====
-const btnSingle = {
-  x: canvas.width / 2 - 140,
-  y: 260,
-  w: 280,
-  h: 60
-};
-
-const btnMulti = {
-  x: canvas.width / 2 - 140,
-  y: 350,
-  w: 280,
-  h: 60
-};
+let scores = {1:null, 2:null};
 
 // ===== AUDIO =====
 let audioEnabled = false;
@@ -99,61 +88,65 @@ function enableAudio() {
 
 function playSound(type) {
   if (!audioEnabled) return;
-
   const osc = audioContext.createOscillator();
   const gain = audioContext.createGain();
   osc.connect(gain);
   gain.connect(audioContext.destination);
 
-  osc.frequency.value =
-    type === "bad" ? 150 : type === "ok" ? 400 : 700;
-
+  osc.frequency.value = type==="bad"?150:type==="ok"?400:700;
   osc.start();
-  gain.gain.exponentialRampToValueAtTime(
-    0.0001,
-    audioContext.currentTime + 0.4
-  );
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.4);
 }
 
-// ===== VIBRACIÓN =====
-function vibrate(ms) {
-  if (navigator.vibrate) navigator.vibrate(ms);
+// ===== BOTONES (SIEMPRE CENTRADOS) =====
+function getButtons() {
+  return {
+    single: {
+      x: canvas.width/2 - 150,
+      y: canvas.height/2 - 80,
+      w: 300,
+      h: 60
+    },
+    multi: {
+      x: canvas.width/2 - 150,
+      y: canvas.height/2 + 10,
+      w: 300,
+      h: 60
+    }
+  };
 }
 
-// ===== MENÚ =====
-function drawButton(btn, text) {
+// ===== DIBUJAR =====
+function drawButton(b, text) {
   ctx.fillStyle = "#222";
-  ctx.fillRect(btn.x, btn.y, btn.w, btn.h);
-
+  ctx.fillRect(b.x, b.y, b.w, b.h);
   ctx.strokeStyle = "white";
   ctx.lineWidth = 3;
-  ctx.strokeRect(btn.x, btn.y, btn.w, btn.h);
-
+  ctx.strokeRect(b.x, b.y, b.w, b.h);
   ctx.fillStyle = "white";
   ctx.font = "26px Arial";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(text, btn.x + btn.w / 2, btn.y + btn.h / 2);
+  ctx.fillText(text, b.x + b.w/2, b.y + b.h/2);
 }
 
 function drawMenu() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+  const btn = getButtons();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle = "white";
   ctx.textAlign = "center";
   ctx.font = "42px Arial";
-  ctx.fillText("CÍRCULO PERFECTO", canvas.width / 2, 140);
+  ctx.fillText("CÍRCULO PERFECTO", canvas.width/2, 140);
 
-  drawButton(btnSingle, "SINGLE PLAYER");
-  drawButton(btnMulti, "MULTIPLAYER");
+  drawButton(btn.single, "SINGLE PLAYER");
+  drawButton(btn.multi, "MULTIPLAYER");
 }
 
-// ===== GUÍA =====
-function drawGuide(centerY) {
+function drawGuide(y) {
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.arc(canvas.width / 2, centerY, 120, 0, Math.PI * 2);
+  ctx.arc(canvas.width/2, y, 120, 0, Math.PI*2);
   ctx.stroke();
 }
 
@@ -163,21 +156,18 @@ canvas.addEventListener("touchstart", e => {
   const t = e.touches[0];
   const x = t.clientX;
   const y = t.clientY;
+  const btn = getButtons();
 
   if (mode === "menu") {
-    if (
-      x > btnSingle.x && x < btnSingle.x + btnSingle.w &&
-      y > btnSingle.y && y < btnSingle.y + btnSingle.h
-    ) {
+    if (x>btn.single.x && x<btn.single.x+btn.single.w &&
+        y>btn.single.y && y<btn.single.y+btn.single.h) {
       mode = "single";
     }
 
-    if (
-      x > btnMulti.x && x < btnMulti.x + btnMulti.w &&
-      y > btnMulti.y && y < btnMulti.y + btnMulti.h
-    ) {
+    if (x>btn.multi.x && x<btn.multi.x+btn.multi.w &&
+        y>btn.multi.y && y<btn.multi.y+btn.multi.h) {
       mode = "multi";
-      scores = { 1: null, 2: null };
+      scores = {1:null, 2:null};
       currentPlayer = 1;
     }
     return;
@@ -190,10 +180,8 @@ canvas.addEventListener("touchstart", e => {
 
 canvas.addEventListener("touchmove", e => {
   if (!drawing) return;
-
   const t = e.touches[0];
-  points.push({ x: t.clientX, y: t.clientY });
-
+  points.push({x:t.clientX, y:t.clientY});
   ctx.strokeStyle = drawColor;
   ctx.lineWidth = 5;
   ctx.lineTo(t.clientX, t.clientY);
@@ -203,79 +191,58 @@ canvas.addEventListener("touchmove", e => {
 canvas.addEventListener("touchend", () => {
   if (!drawing) return;
   drawing = false;
-
-  const score = evaluateCircle();
+  const score = evaluate();
 
   if (mode === "single") {
-    alert(`Tu puntuación: ${score}%`);
+    alert(`Puntuación: ${score}%`);
     mode = "menu";
   } else {
-    handleMultiplayer(score);
+    scores[currentPlayer] = score;
+    currentPlayer++;
+    if (currentPlayer > 2) {
+      const win =
+        scores[1]>scores[2]?"🏆 JUGADOR 1":
+        scores[2]>scores[1]?"🏆 JUGADOR 2":
+        "🤝 EMPATE";
+      alert(`J1: ${scores[1]}%\nJ2: ${scores[2]}%\n${win}`);
+      mode = "menu";
+    }
   }
 });
 
-// ===== CÁLCULO =====
-function evaluateCircle() {
+// ===== SCORE =====
+function evaluate() {
   if (points.length < 30) return 0;
-
-  let cx = 0, cy = 0;
-  points.forEach(p => { cx += p.x; cy += p.y; });
-  cx /= points.length;
-  cy /= points.length;
-
-  const d = points.map(p => Math.hypot(p.x - cx, p.y - cy));
-  const avg = d.reduce((a, b) => a + b) / d.length;
-  const v = d.reduce((a, b) => a + Math.abs(b - avg), 0) / d.length;
-
-  const score = Math.max(0, Math.round(100 - v));
-  const type = score < 50 ? "bad" : score < 80 ? "ok" : "good";
-
-  drawColor = type === "bad" ? "red" : type === "ok" ? "yellow" : "lime";
+  let cx=0, cy=0;
+  points.forEach(p=>{cx+=p.x; cy+=p.y});
+  cx/=points.length; cy/=points.length;
+  const d=points.map(p=>Math.hypot(p.x-cx,p.y-cy));
+  const avg=d.reduce((a,b)=>a+b)/d.length;
+  const v=d.reduce((a,b)=>a+Math.abs(b-avg),0)/d.length;
+  const score=Math.max(0,Math.round(100-v));
+  const type=score<50?"bad":score<80?"ok":"good";
+  drawColor=type==="bad"?"red":type==="ok"?"yellow":"lime";
   playSound(type);
-  vibrate(type === "good" ? 200 : 80);
-
   return score;
-}
-
-// ===== MULTI =====
-function handleMultiplayer(score) {
-  scores[currentPlayer] = score;
-  currentPlayer++;
-
-  if (currentPlayer > 2) {
-    const winner =
-      scores[1] > scores[2] ? "🏆 JUGADOR 1 GANA" :
-      scores[2] > scores[1] ? "🏆 JUGADOR 2 GANA" :
-      "🤝 EMPATE";
-
-    alert(`J1: ${scores[1]}%\nJ2: ${scores[2]}%\n\n${winner}`);
-    mode = "menu";
-  }
 }
 
 // ===== LOOP =====
 function loop() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  if (mode === "menu") drawMenu();
-
-  if (mode === "single") drawGuide(canvas.height / 2);
-
-  if (mode === "multi") {
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 4;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if (mode==="menu") drawMenu();
+  if (mode==="single") drawGuide(canvas.height/2);
+  if (mode==="multi") {
+    ctx.strokeStyle="white";
+    ctx.lineWidth=4;
     ctx.beginPath();
-    ctx.moveTo(0, canvas.height / 2);
-    ctx.lineTo(canvas.width, canvas.height / 2);
+    ctx.moveTo(0,canvas.height/2);
+    ctx.lineTo(canvas.width,canvas.height/2);
     ctx.stroke();
-
-    drawGuide(canvas.height / 4);
-    drawGuide((canvas.height * 3) / 4);
+    drawGuide(canvas.height/4);
+    drawGuide(canvas.height*3/4);
   }
-
   requestAnimationFrame(loop);
 }
-
 loop();
 </script>
 
