@@ -70,7 +70,22 @@ let drawColor = "white";
 let currentPlayer = 1;
 let scores = { 1: null, 2: null };
 
-// ===== AUDIO (iPhone compatible) =====
+// ===== BOTONES =====
+const btnSingle = {
+  x: canvas.width / 2 - 140,
+  y: 260,
+  w: 280,
+  h: 60
+};
+
+const btnMulti = {
+  x: canvas.width / 2 - 140,
+  y: 350,
+  w: 280,
+  h: 60
+};
+
+// ===== AUDIO =====
 let audioEnabled = false;
 let audioContext;
 
@@ -90,9 +105,8 @@ function playSound(type) {
   osc.connect(gain);
   gain.connect(audioContext.destination);
 
-  if (type === "bad") osc.frequency.value = 150;
-  if (type === "ok") osc.frequency.value = 400;
-  if (type === "good") osc.frequency.value = 700;
+  osc.frequency.value =
+    type === "bad" ? 150 : type === "ok" ? 400 : 700;
 
   osc.start();
   gain.gain.exponentialRampToValueAtTime(
@@ -107,17 +121,31 @@ function vibrate(ms) {
 }
 
 // ===== MENÚ =====
+function drawButton(btn, text) {
+  ctx.fillStyle = "#222";
+  ctx.fillRect(btn.x, btn.y, btn.w, btn.h);
+
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(btn.x, btn.y, btn.w, btn.h);
+
+  ctx.fillStyle = "white";
+  ctx.font = "26px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, btn.x + btn.w / 2, btn.y + btn.h / 2);
+}
+
 function drawMenu() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
   ctx.fillStyle = "white";
   ctx.textAlign = "center";
-
   ctx.font = "42px Arial";
   ctx.fillText("CÍRCULO PERFECTO", canvas.width / 2, 140);
 
-  ctx.font = "28px Arial";
-  ctx.fillText("Toca arriba: JUGAR SOLO", canvas.width / 2, 300);
-  ctx.fillText("Toca abajo: MULTIPLAYER", canvas.width / 2, 360);
+  drawButton(btnSingle, "SINGLE PLAYER");
+  drawButton(btnMulti, "MULTIPLAYER");
 }
 
 // ===== GUÍA =====
@@ -132,12 +160,22 @@ function drawGuide(centerY) {
 // ===== INPUT =====
 canvas.addEventListener("touchstart", e => {
   enableAudio();
+  const t = e.touches[0];
+  const x = t.clientX;
+  const y = t.clientY;
 
   if (mode === "menu") {
-    const y = e.touches[0].clientY;
-    if (y < canvas.height / 2) {
+    if (
+      x > btnSingle.x && x < btnSingle.x + btnSingle.w &&
+      y > btnSingle.y && y < btnSingle.y + btnSingle.h
+    ) {
       mode = "single";
-    } else {
+    }
+
+    if (
+      x > btnMulti.x && x < btnMulti.x + btnMulti.w &&
+      y > btnMulti.y && y < btnMulti.y + btnMulti.h
+    ) {
       mode = "multi";
       scores = { 1: null, 2: null };
       currentPlayer = 1;
@@ -164,8 +202,8 @@ canvas.addEventListener("touchmove", e => {
 
 canvas.addEventListener("touchend", () => {
   if (!drawing) return;
-
   drawing = false;
+
   const score = evaluateCircle();
 
   if (mode === "single") {
@@ -185,28 +223,27 @@ function evaluateCircle() {
   cx /= points.length;
   cy /= points.length;
 
-  const distances = points.map(p => Math.hypot(p.x - cx, p.y - cy));
-  const avg = distances.reduce((a, b) => a + b) / distances.length;
-  const variance = distances.reduce((a, b) => a + Math.abs(b - avg), 0) / distances.length;
+  const d = points.map(p => Math.hypot(p.x - cx, p.y - cy));
+  const avg = d.reduce((a, b) => a + b) / d.length;
+  const v = d.reduce((a, b) => a + Math.abs(b - avg), 0) / d.length;
 
-  const score = Math.max(0, Math.round(100 - variance));
-
+  const score = Math.max(0, Math.round(100 - v));
   const type = score < 50 ? "bad" : score < 80 ? "ok" : "good";
-  drawColor = type === "bad" ? "red" : type === "ok" ? "yellow" : "lime";
 
+  drawColor = type === "bad" ? "red" : type === "ok" ? "yellow" : "lime";
   playSound(type);
   vibrate(type === "good" ? 200 : 80);
 
   return score;
 }
 
-// ===== MULTIPLAYER =====
+// ===== MULTI =====
 function handleMultiplayer(score) {
   scores[currentPlayer] = score;
   currentPlayer++;
 
   if (currentPlayer > 2) {
-    let winner =
+    const winner =
       scores[1] > scores[2] ? "🏆 JUGADOR 1 GANA" :
       scores[2] > scores[1] ? "🏆 JUGADOR 2 GANA" :
       "🤝 EMPATE";
@@ -220,13 +257,9 @@ function handleMultiplayer(score) {
 function loop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  if (mode === "menu") {
-    drawMenu();
-  }
+  if (mode === "menu") drawMenu();
 
-  if (mode === "single") {
-    drawGuide(canvas.height / 2);
-  }
+  if (mode === "single") drawGuide(canvas.height / 2);
 
   if (mode === "multi") {
     ctx.strokeStyle = "white";
