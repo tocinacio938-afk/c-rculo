@@ -1,4 +1,15 @@
 <!DOCTYPE html>
+<script>
+let audioEnabled = false;
+let audioContext;
+
+function enableAudio() {
+  if (!audioEnabled) {
+    audioContext = new AudioContext();
+    audioContext.resume();
+    audioEnabled = true;
+  }
+}
 <html>
 <head>
 <meta charset="UTF-8">
@@ -66,11 +77,12 @@ let drawColor = "white";
 
 // 🔊 sonidos (frecuencias)
 function playSound(type) {
-  const audio = new AudioContext();
-  const osc = audio.createOscillator();
-  const gain = audio.createGain();
+  if (!audioEnabled) return;
+
+  const osc = audioContext.createOscillator();
+  const gain = audioContext.createGain();
   osc.connect(gain);
-  gain.connect(audio.destination);
+  gain.connect(audioContext.destination);
 
   if (type === "bad") osc.frequency.value = 150;
   if (type === "ok") osc.frequency.value = 400;
@@ -79,7 +91,7 @@ function playSound(type) {
   osc.start();
   gain.gain.exponentialRampToValueAtTime(
     0.0001,
-    audio.currentTime + 0.5
+    audioContext.currentTime + 0.5
   );
 }
 
@@ -87,6 +99,7 @@ function playSound(type) {
 let bestScore = localStorage.getItem("bestCircle") || 0;
 
 canvas.addEventListener("touchstart", () => {
+  enableAudio();
   points = [];
   drawing = true;
   ctx.beginPath();
